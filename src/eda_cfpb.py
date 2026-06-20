@@ -49,10 +49,15 @@ class InitialEda:
             .list.len()
             .alias("word_count")
         )
-        
+
+        print("\nNarrative Length Statistics:")
+        print(self.df.select("word_count").describe())
+
         plt.figure(figsize=(10, 6))
         sns.histplot(self.df["word_count"].to_numpy(), bins=50, kde=True)
         plt.title("Distribution of Narrative Word Counts")
+        plt.xlabel("Word Count")
+        plt.ylabel("Frequency")
         plt.show()
         
         return self.df.select(["word_count"]).describe()
@@ -91,6 +96,7 @@ class InitialEda:
             .alias("Product_Category")
         )
 
+        self.df = self.df.drop("Product_Lower")
         self.df = self.df.filter(
             pl.col("Product_Category").is_not_null() & 
             pl.col("Consumer complaint narrative").is_not_null()
@@ -151,4 +157,72 @@ class InitialEda:
         plt.figure(figsize=(12, 5))
         sns.histplot(self.df["word_count"].to_numpy(), bins=50, kde=True)
         plt.title(f"Distribution of Narrative Lengths ({stage_name})")
+        plt.xlabel("Word Count")
+        plt.ylabel("Frequency")
         plt.show()
+
+    def impute_metadata(self):
+        
+        sub_product_map = (
+            self.df.drop_nulls(subset=["Sub-product"])
+            .group_by("Product", "Sub-product")
+            .len()
+            .sort("len", descending=True)
+            .unique("Product", keep="first")
+            .select(["Product", "Sub-product"])
+        )
+        
+        self.df = self.df.join(sub_product_map, on="Product", how="left", suffix="_mode")
+        self.df = self.df.with_columns(
+            pl.col("Sub-product").fill_null(pl.col("Sub-product_mode"))
+        ).drop("Sub-product_mode")
+        
+       
+        sub_issue_map = (
+            self.df.drop_nulls(subset=["Sub-issue"])
+            .group_by("Issue", "Sub-issue")
+            .len()
+            .sort("len", descending=True)
+            .unique("Issue", keep="first")
+            .select(["Issue", "Sub-issue"])
+        )
+        
+        self.df = self.df.join(sub_issue_map, on="Issue", how="left", suffix="_mode")
+        self.df = self.df.with_columns(
+            pl.col("Sub-issue").fill_null(pl.col("Sub-issue_mode"))
+        ).drop("Sub-issue_mode")
+        
+        self.df = self.df.with_columns([
+            pl.col("Sub-product").fill_null("Unspecified"),
+            pl.col("Sub-issue").fill_null("Unspecified")
+        ])
+        
+        logger.info("Metadata imputed.")
+        return self.df
+
+    def prepare_metadata(self):
+        self.df = self.df.drop(["Tags", "Consumer disputed?"])
+        
+        metadata_map = {
+            "Company public response": "No public response",
+            "State": "Unknown"
+        }
+        for col, placeholder in metadata_map.items():
+            if col in self.df.columns:
+                self.df = self.df.with_columns(pl.col(col).fill_null(placeholder))
+        
+        logger.info("Metadata standardized for RAG indexing.")
+        return self.df
+
+    def save_csv(self, filename: str = "filtered_complaints.csv"):
+        output_dir = "../data/processed/"
+        filepath = os.path.join(output_dir, filename)
+
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            self.df.write_csv(filepath)
+            logger.info(f"Successfully saved cleaned data to: {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save CSV: {e}")
+            raise e
