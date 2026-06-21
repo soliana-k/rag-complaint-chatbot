@@ -1,4 +1,3 @@
-pandas
 polars
 numpy
 matplotlib
@@ -6,11 +5,12 @@ seaborn
 langchain
 langchain-community
 langchain-huggingface
+langchain-text-splitters
 sentence-transformers
-chromadb
 faiss-cpu
 streamlit
 python-dotenv
 pytest
 ipykernel
 jupyter
+chromadb
