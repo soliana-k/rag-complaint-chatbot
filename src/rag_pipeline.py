@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class RAGPipeline:
-    def __init__(self, parquet_path: str = "../data/raw/complaint_embeddings.parquet"):
+    def __init__(self, parquet_path: str = "data/raw/complaint_embeddings.parquet"):
         self.parquet_path = parquet_path
         self.df = None
         self.embedding_model = None
